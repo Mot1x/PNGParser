@@ -4,7 +4,7 @@ from typing import List, Tuple
 import tkinter as tk
 from PIL import Image, ImageTk
 
-from additionals import Chunk, IHDRData, PLTEData, ColorType, FilterType
+from PNGParser.additionals import Chunk, IHDRData, PLTEData, ColorType, FilterType
 
 
 class PNGParser:
@@ -220,5 +220,5 @@ class PNGParser:
 
 
 if __name__ == '__main__':
-    parser = PNGParser('cat6.png')
+    parser = PNGParser('../img/cat5.png')
     parser.parse()
