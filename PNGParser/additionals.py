@@ -62,3 +62,10 @@ class ColorType:
 @dataclass
 class PLTEData:
     palette: List[Tuple[int, int, int]]
+
+    def __init__(self, data: bytes):
+        palette = []
+        for i in range(0, len(data), 3):
+            r, g, b = struct.unpack('BBB', data[i:i + 3])
+            palette.append((r, g, b))
+        self.palette = palette

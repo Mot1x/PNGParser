@@ -9,8 +9,8 @@ from PNGParser.additionals import Chunk, IHDRData, PLTEData, ColorType, FilterTy
 
 class PNGParser:
     def __init__(self, file_path: str) -> None:
-        self.PLTE_data = None
-        self.file_path = file_path
+        self.PLTE_data: PLTEData | None = None
+        self.file_path: str = file_path
         self.chunks: List[Chunk] = []
         self.IHDR_data: IHDRData | None = None
         self.image_data: bytes = b''
@@ -46,46 +46,15 @@ class PNGParser:
             elif chunk.type == 'IDAT':
                 self.image_data += chunk.data
             elif chunk.type == 'PLTE':
-                self.plte_data = self.parse_plte(chunk.data)
+                self.PLTE_data = PLTEData(chunk.data)
             elif chunk.type == 'IEND':
                 print("Reached IEND chunk.")
                 break
-
-    def parse_ihdr(self, data: bytes) -> IHDRData:
-        fields = struct.unpack('>IIBBBBB', data)
-        ihdr = IHDRData(*fields)
-        return ihdr
-
-    def parse_plte(self, data: bytes) -> PLTEData:
-        palette = []
-        for i in range(0, len(data), 3):
-            r, g, b = struct.unpack('BBB', data[i:i + 3])
-            palette.append((r, g, b))
-        return PLTEData(palette)
 
     def decompress_image_data(self) -> bytes:
         decompressed_data = zlib.decompress(self.image_data)
         print(f"Decompressed image data length: {len(decompressed_data)}")
         return decompressed_data
-
-    def parse_color_type(self) -> ColorType:
-        color_type = self.IHDR_data.color_type
-        has_palette = False
-        has_color = False
-        has_alpha = False
-
-        if color_type >= 4:
-            has_alpha = True
-            color_type -= 4
-        if color_type >= 2:
-            has_color = True
-            color_type -= 2
-        if color_type == 1:
-            has_palette = True
-            color_type -= 1
-        if color_type != 0:
-            raise Exception("Invalid color type")
-        return ColorType(has_palette, has_color, has_alpha)
 
     def reconstruct_image(self, decompressed_data: bytes) -> List[List[Tuple[int, int, int, int]]]:
         width = self.IHDR_data.width
@@ -139,7 +108,7 @@ class PNGParser:
 
     def apply_no_filter(self, bytes_per_pixel, color_type, scanline):
         if color_type.has_palette:
-            row = [self.plte_data.palette[scanline[i]] for i in range(len(scanline))]
+            row = [self.PLTE_data.palette[scanline[i]] for i in range(len(scanline))]
         elif color_type.has_alpha:
             row = [(scanline[i], scanline[i + 1], scanline[i + 2], scanline[i + 3]) for i in
                    range(0, len(scanline), bytes_per_pixel)]
