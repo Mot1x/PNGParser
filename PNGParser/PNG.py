@@ -120,13 +120,13 @@ class PNGParser:
     def apply_sub_filter(self, bpp, color_type, filtered_row, index, pixel):
         if color_type.has_palette:
             left_index = filtered_row[index - 1] if index > 0 else 0
-            return self.plte_data.palette[(pixel[0] + left_index) % 256]
+            return self.PLTE_data.palette[(pixel[0] + left_index) % 256]
         return tuple((pixel[j] + (filtered_row[-1][j] if len(filtered_row) > 0 else 0)) % 256 for j in range(bpp))
 
     def apply_up_filter(self, bpp, color_type, i, pixel, prev_row):
         if color_type.has_palette:
             up_index = prev_row[i] if prev_row else 0
-            return self.plte_data.palette[(pixel[0] + up_index) % 256]
+            return self.PLTE_data.palette[(pixel[0] + up_index) % 256]
         return tuple((pixel[j] + (prev_row[i // bpp][j] if prev_row else 0)) % 256 for j in range(bpp))
 
     def apply_average_filter(self, bpp, color_type, filtered_row, i, pixel, prev_row):
@@ -134,7 +134,7 @@ class PNGParser:
         up = prev_row[i // bpp] if prev_row else (0, 0, 0, 0)
         filtered_pixel = tuple((pixel[j] + ((left[j] + up[j]) // 2)) % 256 for j in range(bpp))
         if color_type.has_palette:
-            return self.PLTE_data(filtered_pixel[0])
+            return self.PLTE_data.palette[filtered_pixel[0]]
         return filtered_pixel
 
     def apply_paeth_filter(self, bpp, color_type, filtered_row, i, pixel, prev_row):
@@ -143,7 +143,7 @@ class PNGParser:
         upleft = prev_row[i // bpp - 1] if (prev_row and i >= bpp) else (0, 0, 0, 0)
         filtered_pixel = tuple((pixel[j] + self.paeth_predictor(left[j], up[j], upleft[j])) % 256 for j in range(bpp))
         if color_type.has_palette:
-            filtered_pixel = self.PLTE_data(filtered_pixel[0])
+            filtered_pixel = self.PLTE_data.palette[filtered_pixel[0]]
         return filtered_pixel
 
     def paeth_predictor(self, a: int, b: int, c: int) -> int:
@@ -189,5 +189,5 @@ class PNGParser:
 
 
 if __name__ == '__main__':
-    parser = PNGParser('../img/cat5.png')
+    parser = PNGParser('../tests/cubes.png')
     parser.parse()
