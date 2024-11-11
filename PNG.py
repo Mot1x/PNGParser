@@ -1,48 +1,15 @@
 import struct
 import zlib
 from typing import List, Tuple
-from dataclasses import dataclass
 import tkinter as tk
 from PIL import Image, ImageTk
 
-
-@dataclass
-class Chunk:
-    length: int
-    type: str
-    data: bytes
-    crc: int
-
-    def __repr__(self) -> str:
-        return f"Chunk(type={self.type}, length={self.length})"
-
-
-@dataclass
-class IHDRData:
-    width: int
-    height: int
-    bit_depth: int
-    color_type: int
-    compression: int
-    filter_method: int
-    interlace: int
-
-
-@dataclass
-class ColorType:
-    has_palette: bool
-    has_color: bool
-    has_alpha: bool
-
-
-@dataclass
-class PLTEData:
-    palette: List[Tuple[int, int, int]]
+from additionals import Chunk, IHDRData, PLTEData, ColorType, FilterType
 
 
 class PNGParser:
     def __init__(self, file_path: str) -> None:
-        self.plte_data = None
+        self.PLTE_data = None
         self.file_path = file_path
         self.chunks: List[Chunk] = []
         self.IHDR_data: IHDRData | None = None
@@ -74,7 +41,7 @@ class PNGParser:
     def process_chunks(self) -> None:
         for chunk in self.chunks:
             if chunk.type == 'IHDR':
-                self.IHDR_data = self.parse_ihdr(chunk.data)
+                self.IHDR_data = IHDRData(chunk.data)
                 print(f"IHDR Data: {self.IHDR_data}")
             elif chunk.type == 'IDAT':
                 self.image_data += chunk.data
@@ -123,80 +90,92 @@ class PNGParser:
     def reconstruct_image(self, decompressed_data: bytes) -> List[List[Tuple[int, int, int, int]]]:
         width = self.IHDR_data.width
         height = self.IHDR_data.height
-        color_type = self.parse_color_type()
-
-        bytes_per_pixel = 3
-        if color_type.has_palette:
-            bytes_per_pixel = 1
-        elif color_type.has_alpha:
-            bytes_per_pixel = 4
+        color_type = ColorType(self.IHDR_data.color_type)
+        bytes_per_pixel = self.calculate_bytes_per_pixel(color_type)
 
         stride = width * bytes_per_pixel
         image = []
         offset = 0
         for y in range(height):
-            filter_type = decompressed_data[offset]
+            filter_type = FilterType(decompressed_data[offset])
             offset += 1
             scanline = decompressed_data[offset:offset + stride]
             offset += stride
-            if filter_type == 0:
-                if color_type.has_palette:
-                    row = [self.plte_data.palette[scanline[i]] for i in range(len(scanline))]
-                elif color_type.has_alpha:
-                    row = [(scanline[i], scanline[i + 1], scanline[i + 2], scanline[i + 3]) for i in
-                           range(0, len(scanline), bytes_per_pixel)]
-                else:
-                    row = [(scanline[i], scanline[i + 1], scanline[i + 2]) for i in
-                           range(0, len(scanline), bytes_per_pixel)]
-            else:
-                row = self.apply_filter(filter_type, color_type, scanline, image[y - 1] if y > 0 else None,
-                                        bytes_per_pixel)
+            row = self.apply_filter(filter_type, color_type, scanline, image[y - 1] if y > 0 else None, bytes_per_pixel)
             image.append(row)
         print(f"Reconstructed image with {len(image)} rows.")
         return image
 
-    def apply_filter(self, filter_type: int, color_type: ColorType, scanline: bytes,
+    def calculate_bytes_per_pixel(self, color_type):
+        if color_type.has_palette:
+            return 1
+        elif color_type.has_alpha:
+            return 4
+        return 3
+
+    def apply_filter(self, filter_type: FilterType, color_type: ColorType, scanline: bytes,
                      prev_row: List[Tuple[int, int, int, int]] | None,
                      bpp: int) -> List[Tuple[int, int, int, int]]:
         filtered_row = []
+
+        if filter_type == FilterType.NO_FILTER:
+            return self.apply_no_filter(bpp, color_type, scanline)
+
         for i in range(0, len(scanline), bpp):
             pixel = scanline[i:i + bpp]
-            if filter_type == 1:
-                if color_type.has_palette:
-                    left_index = filtered_row[i - 1] if i > 0 else 0
-                    filtered_pixel = self.plte_data.palette[(pixel[0] + left_index) % 256]
-                else:
-                    filtered_pixel = tuple(
-                        (pixel[j] + (filtered_row[-1][j] if len(filtered_row) > 0 else 0)) % 256 for j in range(bpp))
 
-            elif filter_type == 2:
-                if color_type.has_palette:
-                    up_index = prev_row[i] if prev_row else 0
-                    filtered_pixel = self.plte_data.palette[(pixel[0] + up_index) % 256]
-                else:
-                    filtered_pixel = tuple(
-                        (pixel[j] + (prev_row[i // bpp][j] if prev_row else 0)) % 256 for j in range(bpp))
-
-            elif filter_type == 3:
-                left = filtered_row[-1] if len(filtered_row) > 0 else (0, 0, 0, 0)
-                up = prev_row[i // bpp] if prev_row else (0, 0, 0, 0)
-                filtered_pixel = tuple((pixel[j] + ((left[j] + up[j]) // 2)) % 256 for j in range(bpp))
-                if color_type.has_palette:
-                    filtered_pixel = self.plte_data(filtered_pixel[0])
-
-            elif filter_type == 4:
-                left = filtered_row[-1] if len(filtered_row) > 0 else (0, 0, 0, 0)
-                up = prev_row[i // bpp] if prev_row else (0, 0, 0, 0)
-                upleft = prev_row[i // bpp - 1] if (prev_row and i >= bpp) else (0, 0, 0, 0)
-                filtered_pixel = tuple(
-                    (pixel[j] + self.paeth_predictor(left[j], up[j], upleft[j])) % 256 for j in range(bpp))
-                if color_type.has_palette:
-                    filtered_pixel = self.plte_data(filtered_pixel[0])
-
+            if filter_type == FilterType.SUB:
+                filtered_pixel = self.apply_sub_filter(bpp, color_type, filtered_row, i, pixel)
+            elif filter_type == FilterType.UP:
+                filtered_pixel = self.apply_up_filter(bpp, color_type, i, pixel, prev_row)
+            elif filter_type == FilterType.AVERAGE:
+                filtered_pixel = self.apply_average_filter(bpp, color_type, filtered_row, i, pixel, prev_row)
+            elif filter_type == FilterType.PAETH:
+                filtered_pixel = self.apply_paeth_filter(bpp, color_type, filtered_row, i, pixel, prev_row)
             else:
                 filtered_pixel = tuple(pixel)
             filtered_row.append(filtered_pixel)
         return filtered_row
+
+    def apply_no_filter(self, bytes_per_pixel, color_type, scanline):
+        if color_type.has_palette:
+            row = [self.plte_data.palette[scanline[i]] for i in range(len(scanline))]
+        elif color_type.has_alpha:
+            row = [(scanline[i], scanline[i + 1], scanline[i + 2], scanline[i + 3]) for i in
+                   range(0, len(scanline), bytes_per_pixel)]
+        else:
+            row = [(scanline[i], scanline[i + 1], scanline[i + 2]) for i in
+                   range(0, len(scanline), bytes_per_pixel)]
+        return row
+
+    def apply_sub_filter(self, bpp, color_type, filtered_row, index, pixel):
+        if color_type.has_palette:
+            left_index = filtered_row[index - 1] if index > 0 else 0
+            return self.plte_data.palette[(pixel[0] + left_index) % 256]
+        return tuple((pixel[j] + (filtered_row[-1][j] if len(filtered_row) > 0 else 0)) % 256 for j in range(bpp))
+
+    def apply_up_filter(self, bpp, color_type, i, pixel, prev_row):
+        if color_type.has_palette:
+            up_index = prev_row[i] if prev_row else 0
+            return self.plte_data.palette[(pixel[0] + up_index) % 256]
+        return tuple((pixel[j] + (prev_row[i // bpp][j] if prev_row else 0)) % 256 for j in range(bpp))
+
+    def apply_average_filter(self, bpp, color_type, filtered_row, i, pixel, prev_row):
+        left = filtered_row[-1] if len(filtered_row) > 0 else (0, 0, 0, 0)
+        up = prev_row[i // bpp] if prev_row else (0, 0, 0, 0)
+        filtered_pixel = tuple((pixel[j] + ((left[j] + up[j]) // 2)) % 256 for j in range(bpp))
+        if color_type.has_palette:
+            return self.PLTE_data(filtered_pixel[0])
+        return filtered_pixel
+
+    def apply_paeth_filter(self, bpp, color_type, filtered_row, i, pixel, prev_row):
+        left = filtered_row[-1] if len(filtered_row) > 0 else (0, 0, 0, 0)
+        up = prev_row[i // bpp] if prev_row else (0, 0, 0, 0)
+        upleft = prev_row[i // bpp - 1] if (prev_row and i >= bpp) else (0, 0, 0, 0)
+        filtered_pixel = tuple((pixel[j] + self.paeth_predictor(left[j], up[j], upleft[j])) % 256 for j in range(bpp))
+        if color_type.has_palette:
+            filtered_pixel = self.PLTE_data(filtered_pixel[0])
+        return filtered_pixel
 
     def paeth_predictor(self, a: int, b: int, c: int) -> int:
         p = a + b - c
@@ -205,7 +184,7 @@ class PNGParser:
         pc = abs(p - c)
         if pa <= pb and pa <= pc:
             return a
-        elif pb <= pc:
+        if pb <= pc:
             return b
         return c
 
@@ -241,5 +220,5 @@ class PNGParser:
 
 
 if __name__ == '__main__':
-    parser = PNGParser('cat5 (2).png')
+    parser = PNGParser('cat6.png')
     parser.parse()
