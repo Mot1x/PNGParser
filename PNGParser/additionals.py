@@ -1,7 +1,7 @@
 import struct
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Tuple
+from typing import List
 
 
 class FilterType(Enum):
@@ -10,6 +10,14 @@ class FilterType(Enum):
     UP = 2
     AVERAGE = 3
     PAETH = 4
+
+
+@dataclass
+class Pixel:
+    R: int
+    G: int
+    B: int
+    A: int = 0
 
 
 @dataclass
@@ -43,15 +51,7 @@ class ColorType:
 
 @dataclass
 class PLTEData:
-    palette: List[Tuple[int, int, int]]
-
-
-@dataclass
-class Pixel:
-    R: int
-    G: int
-    B: int
-    A: int = 0
+    palette: List[Pixel]
 
 
 class Parsing:
@@ -59,27 +59,27 @@ class Parsing:
     def bytes_to_PLTEData(data: bytes) -> PLTEData:
         palette = []
         for i in range(0, len(data), 3):
-            r, g, b = struct.unpack('BBB', data[i:i + 3])
-            palette.append((r, g, b))
-        return PLTEData(palette)
+            r, g, b = data[i:i + 3]
+            palette.append(Pixel(R=r, G=g, B=b))
+        return PLTEData(palette=palette)
 
     @staticmethod
     def bytes_to_IHDRData(data: bytes) -> IHDRData:
-        fields = struct.unpack('>IIBBBBB', data)
-        return IHDRData(*fields)
+        width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack('>IIBBBBB', data)
+        return IHDRData(
+            width=width,
+            height=height,
+            bit_depth=bit_depth,
+            color_type=color_type,
+            compression=compression,
+            filter_method=filter_method,
+            interlace=interlace
+        )
 
     @staticmethod
     def parse_color_type(color_type: int) -> ColorType:
-        color = ColorType()
-        if color_type >= 4:
-            color.has_alpha = True
-            color_type -= 4
-        if color_type >= 2:
-            color.has_color = True
-            color_type -= 2
-        if color_type == 1:
-            color.has_palette = True
-            color_type -= 1
-        if color_type != 0:
-            raise Exception("Invalid color type")
-        return color
+        return ColorType(
+            has_palette=bool(color_type & 1),
+            has_color=bool(color_type & 2),
+            has_alpha=bool(color_type & 4)
+        )
