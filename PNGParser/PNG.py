@@ -3,20 +3,21 @@ import zlib
 from typing import List, Tuple
 import tkinter as tk
 from PIL import Image, ImageTk
+from pathlib import Path
 
-from PNGParser.additionals import Chunk, IHDRData, PLTEData, ColorType, FilterType
+from PNGParser.additionals import Chunk, IHDRData, PLTEData, ColorType, FilterType, Parsing
 
 
 class PNGParser:
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_path: str | Path) -> None:
         self.PLTE_data: PLTEData | None = None
-        self.file_path: str = file_path
+        self.file_path = Path(file_path)
         self.chunks: List[Chunk] = []
         self.IHDR_data: IHDRData | None = None
         self.image_data: bytes = b''
 
     def read_file(self) -> bytes:
-        with open(self.file_path, 'rb') as f:
+        with self.file_path.open('rb') as f:
             data = f.read()
         return data
 
@@ -41,12 +42,12 @@ class PNGParser:
     def process_chunks(self) -> None:
         for chunk in self.chunks:
             if chunk.type == 'IHDR':
-                self.IHDR_data = IHDRData(chunk.data)
+                self.IHDR_data = Parsing.bytes_to_IHDRData(chunk.data)
                 print(f"IHDR Data: {self.IHDR_data}")
             elif chunk.type == 'IDAT':
                 self.image_data += chunk.data
             elif chunk.type == 'PLTE':
-                self.PLTE_data = PLTEData(chunk.data)
+                self.PLTE_data = Parsing.bytes_to_PLTEData(chunk.data)
             elif chunk.type == 'IEND':
                 print("Reached IEND chunk.")
                 break
@@ -59,7 +60,7 @@ class PNGParser:
     def reconstruct_image(self, decompressed_data: bytes) -> List[List[Tuple[int, int, int, int]]]:
         width = self.IHDR_data.width
         height = self.IHDR_data.height
-        color_type = ColorType(self.IHDR_data.color_type)
+        color_type = Parsing.parse_color_type(self.IHDR_data.color_type)
         bytes_per_pixel = self.calculate_bytes_per_pixel(color_type)
 
         stride = width * bytes_per_pixel

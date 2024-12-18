@@ -5,7 +5,7 @@ import sys
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 from PNGParser.PNG import PNGParser, ColorType
-from PNGParser.additionals import FilterType, IHDRData
+from PNGParser.additionals import FilterType, IHDRData, Parsing
 
 image_name = "cubes.png"
 image_path = os.path.abspath(os.path.join(os.path.dirname(__file__), image_name))
@@ -55,7 +55,7 @@ def test_parse_ihdr(parser):
     data = parser.read_file()
     parser.parse_chunks(data)
     ihdr_chunk = next(chunk for chunk in parser.chunks if chunk.type == "IHDR")
-    ihdr_data = IHDRData(ihdr_chunk.data)
+    ihdr_data = Parsing.bytes_to_IHDRData(ihdr_chunk.data)
     assert isinstance(ihdr_data, IHDRData), "IHDR data should be instance of IHDRData"
     assert ihdr_data.width == 800, "Expected width 800"
     assert ihdr_data.height == 600, "Expected height 600"
@@ -76,7 +76,7 @@ def test_parse_color_type(parser):
     data = parser.read_file()
     parser.parse_chunks(data)
     parser.process_chunks()
-    color_type = ColorType(parser.IHDR_data.color_type)
+    color_type = Parsing.parse_color_type(parser.IHDR_data.color_type)
     assert isinstance(color_type, ColorType), "Color type should be instance of ColorType"
     assert color_type.has_color is True, "Expected color to be present"
     assert color_type.has_alpha is True, "Expected alpha channel to be present"
@@ -97,7 +97,7 @@ def test_apply_filter(parser):
     data = parser.read_file()
     parser.parse_chunks(data)
     parser.process_chunks()
-    color_type = ColorType(parser.IHDR_data.color_type)
+    color_type = Parsing.parse_color_type(parser.IHDR_data.color_type)
     scanline = bytes([100, 100, 100, 255] * 5)
     result = parser.apply_filter(FilterType.NO_FILTER, color_type, scanline, None, 4)
     assert len(result) == 5, "Resulting row should contain 5 pixels"

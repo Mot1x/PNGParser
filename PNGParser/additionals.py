@@ -33,11 +33,6 @@ class IHDRData:
     filter_method: int
     interlace: int
 
-    def __init__(self, data: bytes):
-        fields = struct.unpack('>IIBBBBB', data)
-        (self.width, self.height, self.bit_depth,
-         self.color_type, self.compression, self.filter_method, self.interlace) = fields
-
 
 @dataclass
 class ColorType:
@@ -45,27 +40,46 @@ class ColorType:
     has_color: bool = False
     has_alpha: bool = False
 
-    def __init__(self, color_type: int):
-        if color_type >= 4:
-            self.has_alpha = True
-            color_type -= 4
-        if color_type >= 2:
-            self.has_color = True
-            color_type -= 2
-        if color_type == 1:
-            self.has_palette = True
-            color_type -= 1
-        if color_type != 0:
-            raise Exception("Invalid color type")
-
 
 @dataclass
 class PLTEData:
     palette: List[Tuple[int, int, int]]
 
-    def __init__(self, data: bytes):
+
+@dataclass
+class Pixel:
+    R: int
+    G: int
+    B: int
+    A: int = 0
+
+
+class Parsing:
+    @staticmethod
+    def bytes_to_PLTEData(data: bytes) -> PLTEData:
         palette = []
         for i in range(0, len(data), 3):
             r, g, b = struct.unpack('BBB', data[i:i + 3])
             palette.append((r, g, b))
-        self.palette = palette
+        return PLTEData(palette)
+
+    @staticmethod
+    def bytes_to_IHDRData(data: bytes) -> IHDRData:
+        fields = struct.unpack('>IIBBBBB', data)
+        return IHDRData(*fields)
+
+    @staticmethod
+    def parse_color_type(color_type: int) -> ColorType:
+        color = ColorType()
+        if color_type >= 4:
+            color.has_alpha = True
+            color_type -= 4
+        if color_type >= 2:
+            color.has_color = True
+            color_type -= 2
+        if color_type == 1:
+            color.has_palette = True
+            color_type -= 1
+        if color_type != 0:
+            raise Exception("Invalid color type")
+        return color
