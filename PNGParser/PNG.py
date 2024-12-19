@@ -1,6 +1,5 @@
 import struct
 import zlib
-from typing import List
 import tkinter as tk
 from PIL import Image, ImageTk
 from pathlib import Path
@@ -11,7 +10,7 @@ class PNGParser:
     def __init__(self, file_path: str | Path) -> None:
         self.PLTE_data: PLTEData | None = None
         self.file_path: Path = Path(file_path)
-        self.chunks: List[Chunk] = []
+        self.chunks: list[Chunk] = []
         self.IHDR_data: IHDRData | None = None
         self.image_data: bytes = b''
 
@@ -58,7 +57,7 @@ class PNGParser:
         print(f"Decompressed image data length: {len(decompressed_data)}")
         return decompressed_data
 
-    def reconstruct_image(self, decompressed_data: bytes) -> List[List[Pixel]]:
+    def reconstruct_image(self, decompressed_data: bytes) -> list[list[Pixel]]:
         image_width: int = self.IHDR_data.width
         image_height: int = self.IHDR_data.height
         color_type: ColorType = Parsing.parse_color_type(self.IHDR_data.color_type)
@@ -85,8 +84,8 @@ class PNGParser:
         return 3
 
     def apply_filter(self, filter_type: FilterType, color_type: ColorType, scanline: bytes,
-                     prev_row: List[Pixel] | None,
-                     bytes_per_pixel: int) -> List[Pixel]:
+                     prev_row: list[Pixel] | None,
+                     bytes_per_pixel: int) -> list[Pixel]:
         filtered_row = []
 
         if filter_type == FilterType.NO_FILTER:
@@ -123,7 +122,7 @@ class PNGParser:
         return pixel.R, pixel.G, pixel.B, pixel.A
 
     def apply_no_filter(self, bytes_per_pixel: int, color_type: ColorType,
-                        scanline: bytes) -> List[Pixel]:
+                        scanline: bytes) -> list[Pixel]:
         if color_type.has_palette:
             return [self.PLTE_data.palette[scanline[i]] for i in range(len(scanline))]
 
@@ -133,7 +132,7 @@ class PNGParser:
             pixels.append(self.bytes_to_pixel(pixel_bytes, bytes_per_pixel))
         return pixels
 
-    def apply_sub_filter(self, bytes_per_pixel: int, color_type: ColorType, filtered_row: List[Pixel], pixel_index: int,
+    def apply_sub_filter(self, bytes_per_pixel: int, color_type: ColorType, filtered_row: list[Pixel], pixel_index: int,
                          pixel: bytes) -> Pixel:
         if color_type.has_palette:
             left_value: int = filtered_row[pixel_index - 1].R if pixel_index > 0 else 0
@@ -155,7 +154,7 @@ class PNGParser:
 
     def apply_up_filter(self, bytes_per_pixel: int, color_type: ColorType,
                         pixel_index: int, pixel: bytes,
-                        prev_row: List[Pixel]) -> Pixel:
+                        prev_row: list[Pixel]) -> Pixel:
         if color_type.has_palette:
             up_value: int = prev_row[pixel_index].R if prev_row else 0
             return self.PLTE_data.palette[(pixel[0] + up_value) % 256]
@@ -175,8 +174,8 @@ class PNGParser:
         )
 
     def apply_average_filter(self, bytes_per_pixel: int, color_type: ColorType,
-                             filtered_row: List[Pixel], pixel_index: int,
-                             pixel: bytes, prev_row: List[Pixel]) -> Pixel:
+                             filtered_row: list[Pixel], pixel_index: int,
+                             pixel: bytes, prev_row: list[Pixel]) -> Pixel:
         left_pixel = filtered_row[-1] if filtered_row else Pixel(0, 0, 0, 0)
         up_pixel = prev_row[pixel_index // bytes_per_pixel] if prev_row else Pixel(0, 0, 0, 0)
 
@@ -198,8 +197,8 @@ class PNGParser:
         )
 
     def apply_paeth_filter(self, bytes_per_pixel: int, color_type: ColorType,
-                           filtered_row: List[Pixel], pixel_index: int,
-                           pixel: bytes, prev_row: List[Pixel]) -> Pixel:
+                           filtered_row: list[Pixel], pixel_index: int,
+                           pixel: bytes, prev_row: list[Pixel]) -> Pixel:
         left_pixel = filtered_row[-1] if filtered_row else Pixel(0, 0, 0, 0)
         up_pixel = prev_row[pixel_index // bytes_per_pixel] if prev_row else Pixel(0, 0, 0, 0)
         upleft_pixel = (prev_row[pixel_index // bytes_per_pixel - 1]
@@ -233,7 +232,7 @@ class PNGParser:
             return b
         return c
 
-    def display_image(self, image_data: List[List[Pixel]]) -> None:
+    def display_image(self, image_data: list[list[Pixel]]) -> None:
         image_width: int = self.IHDR_data.width
         image_height: int = self.IHDR_data.height
         image = Image.new('RGBA', (image_width, image_height))
@@ -253,7 +252,7 @@ class PNGParser:
         self.parse_chunks(png_data)
         self.process_chunks()
         decompressed_data: bytes = self.decompress_image_data()
-        image_data: List[List[Pixel]] = self.reconstruct_image(decompressed_data)
+        image_data: list[list[Pixel]] = self.reconstruct_image(decompressed_data)
         self.print_chunk_info()
         self.display_image(image_data)
 
