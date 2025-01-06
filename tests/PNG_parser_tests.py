@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import os
 import sys
@@ -7,12 +9,9 @@ sys.path.insert(0, project_root)
 from PNGParser.PNG import PNGParser, ColorType
 from PNGParser.additionals import FilterType, IHDRData, Parsing
 
-image_name = "cubes.png"
-image_path = os.path.abspath(os.path.join(os.path.dirname(__file__), image_name))
-
 
 @pytest.fixture
-def parser():
+def parser(image_path):
     return PNGParser(image_path)
 
 

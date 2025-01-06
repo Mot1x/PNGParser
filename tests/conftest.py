@@ -6,13 +6,18 @@ project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 from PNGParser.PNG import PNGParser
 
-image_name = "cubes.png"
-image_path = Path(__file__).parent / image_name
 
 @pytest.fixture(scope="session")
-def parser():
+def image_path():
+    image_name = "cubes.png"
+    return Path(__file__).parent / image_name
+
+
+@pytest.fixture(scope="session")
+def parser(image_path):
     """Shared parser instance for all tests"""
-    return PNGParser(str(image_path))
+    return PNGParser(image_path)
+
 
 @pytest.fixture(scope="session")
 def parsed_data(parser):

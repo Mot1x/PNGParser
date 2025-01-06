@@ -1,18 +1,16 @@
 import pytest
 import sys
 from pathlib import Path
+from PNGParser.PNG import PNGParser
 
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
-from PNGParser.PNG import PNGParser
 
-image_name = "cubes.png"
-image_path = Path(__file__).parent / image_name
 
 class TestFileOperations:
     @pytest.fixture
-    def parser(self):
-        return PNGParser(str(image_path))
+    def parser(self, image_path):
+        return PNGParser(image_path)
 
     def test_read_file(self, parser):
         data = parser.read_file()

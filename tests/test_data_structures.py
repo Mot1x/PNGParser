@@ -1,19 +1,17 @@
 import pytest
 import sys
 from pathlib import Path
-
-project_root = Path(__file__).parent.parent
-sys.path.append(str(project_root))
 from PNGParser.PNG import PNGParser, ColorType
 from PNGParser.additionals import Parsing
 
-image_name = "cubes.png"
-image_path = Path(__file__).parent / image_name
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
 
 class TestDataStructures:
     @pytest.fixture
-    def parser(self):
-        return PNGParser(str(image_path))
+    def parser(self, image_path):
+        return PNGParser(image_path)
 
     def test_parse_color_type(self, parser):
         data = parser.read_file()
