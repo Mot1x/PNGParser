@@ -1,13 +1,11 @@
-from pathlib import Path
-
 import pytest
-import os
 import sys
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+from pathlib import Path
 from PNGParser.PNG import PNGParser, ColorType
 from PNGParser.additionals import FilterType, IHDRData, Parsing
+
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
 
 
 @pytest.fixture
